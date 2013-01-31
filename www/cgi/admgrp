@@ -727,7 +727,7 @@ d cgi-register {action edit} {
     #
 
     set lines {}
-    set lv {}
+    set lv [list ""]
     set idx 1
     foreach v [::pgsql::getcols $dbfd topo.vlan "" "vlanid ASC" {vlanid descr}] {
 	lassign $v vlanid descr
