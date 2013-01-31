@@ -258,6 +258,23 @@ set libconf(tabdhcpprofile) {
     }
 }
 
+set libconf(tabvlan) {
+    global {
+	chars {10 normal}
+	align {left}
+	botbar {yes}
+	columns {100}
+    }
+    pattern VLAN {
+	vbar {yes}
+	column {
+	    format {lines}
+	}
+	vbar {yes}
+    }
+}
+
+
 set libconf(tabmachine) {
     global {
 	chars {10 normal}
@@ -2723,6 +2740,25 @@ proc display-group {dbfd idgrp} {
     }
 
     #
+    # Get authorized VLAN
+    #
+
+    set lines {}
+    set sql "SELECT d.vlanid, v.descr
+			FROM topo.dr_vlan d, topo.vlan v
+			WHERE d.idgrp = $idgrp AND
+				v.vlanid = d.vlanid
+			ORDER BY d.vlanid"
+    pg_select $dbfd $sql tab {
+	lappend lines [list VLAN "$tab(vlanid) - $tab(descr)"]
+    }
+    if {[llength $lines] > 0} then {
+	set tabvlan [::arrgen::output "html" $libconf(tabvlan) $lines]
+    } else {
+	set tabvlan [mc "No allowed VLAN"]
+    }
+
+    #
     # Get equipment permissions
     #
 
@@ -2759,6 +2795,7 @@ proc display-group {dbfd idgrp} {
 		    $tabdomains \
 		    $tabdhcpprofile \
 		    $tabdreq \
+		    $tabvlan \
 	    ]
 }
 
@@ -2957,6 +2994,9 @@ proc read-user {dbfd login _tabuid _msg} {
     # Topo specific characteristics
     #
 
+    # Read authorized VLANs
+    set tabuid(vlans) [allowed-vlans $dbfd $tabuid(idgrp)]
+
     # Read authorized CIDR
     set tabuid(reseaux) [allowed-networks $dbfd $tabuid(idgrp) "consult"]
 
@@ -2995,6 +3035,11 @@ proc read-user {dbfd login _tabuid _msg} {
 		if {$r6 ne ""} then {
 		    lappend flags "-n" $r6
 		}
+	    }
+
+	    # Next, build access rights on vlans
+	    foreach vlan $tabuid(vlans) {
+		lappend flags "-v" $vlan
 	    }
 
 	    # Next, build access rights on equipements (part 1)
@@ -5264,6 +5309,35 @@ proc allowed-networks {dbfd idgrp priv} {
     }
 
     return $lnet
+}
+
+#
+# Return list of vlan for a given group 
+#
+# Input:
+#   - parameters:
+#	- dbfd : database handle
+#	- idgrp : group id
+# Output:
+#   - return value: list of vlan ids
+#
+# History
+#   2013/01/24 : jean : adaptated from allowed-networks
+#
+
+proc allowed-vlans {dbfd idgrp} {
+    #
+    # Get all allowed vlans for this group
+    #
+
+    set lvlan {}
+    set sql "SELECT vlanid FROM topo.dr_vlan
+	    	WHERE idgrp = $idgrp"
+    pg_select $dbfd $sql tab {
+	lappend lvlan $tab(vlanid)
+    }
+
+    return $lvlan
 }
 
 #

@@ -184,6 +184,17 @@
 	    }
 	    \lignetableau {
 		\casetableau {
+		     \couleurfond {#C0C0C0}
+		    \centragehorizontal {CENTER}
+		} {\gras {VLAN autorisés}}
+	    }
+	    \lignetableau {
+		\casetableau {} {
+
+		    %LISTEVLAN%}
+	    }
+	    \lignetableau {
+		\casetableau {
 		    \centragehorizontal {CENTER}
 		} {
 		    <div id="buttons">

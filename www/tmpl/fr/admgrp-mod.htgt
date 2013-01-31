@@ -58,6 +58,10 @@
     \titre {2} {Équipements}
 
     %TABDREQ%
+
+    \titre {2} {VLANs}
+
+    %TABVLAN%
 }
 
 }

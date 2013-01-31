@@ -254,6 +254,29 @@ set conf(tabdhcpprofil) {
     }
 }
 
+set conf(tabvlan) {
+    global {
+	chars {12 normal}
+	botbar {no}
+	columns {100}
+	align {center}
+    }
+    pattern Title {
+	topbar {no}
+	vbar {no}
+	chars {bold}
+	column { }
+	vbar {no}
+    }
+    pattern Normal {
+	topbar {no}
+	vbar {no}
+	column {
+	    format {raw}
+	}
+	vbar {no}
+    }
+}
 
 #
 # Netmagis general library
@@ -700,6 +723,44 @@ d cgi-register {action edit} {
     set listedhcpprof [::arrgen::output "html" $conf(tabdhcpprofil) $lines]
 
     #
+    # VLANs
+    #
+
+    set lines {}
+    set lv {}
+    set idx 1
+    foreach v [::pgsql::getcols $dbfd topo.vlan "" "vlanid ASC" {vlanid descr}] {
+	lassign $v vlanid descr
+	lappend lv [list $descr "$vlanid - $descr"]
+	lappend tv($vlanid) $idx
+	incr idx
+    }
+    lappend lines [list "Title" [mc "Vlans"]]
+    set sql "SELECT vlanid AS vlanid
+			FROM topo.dr_vlan
+			WHERE idgrp = $idgrp
+			ORDER BY vlanid ASC"
+    set nvlan 1
+    pg_select $dbfd $sql tab {
+	set vlanid $tab(vlanid)
+	if {! [info exists tv($vlanid)]} then {
+	    d error [mc "Group have access to vlan '%s' which does not exist in the database" $vlanid]
+	}
+	set idx $tv($vlanid)
+	set hvlan  [::webapp::form-menu vlan$nvlan 1 0 $lv [list $idx]]
+	lappend lines [list Normal $hvlan]
+	incr nvlan
+    }
+
+    for {set i 1} {$i <= 5} {incr i} {
+	set hvlan  [::webapp::form-menu vlan$nvlan 1 0 $lv [list 0]]
+	lappend lines [list Normal $hvlan]
+	incr nvlan
+    }
+
+    set listevlan [::arrgen::output "html" $conf(tabvlan) $lines]
+
+    #
     # End of script: output page and close database
     #
 
@@ -720,6 +781,7 @@ d cgi-register {action edit} {
 				[list %LISTEDROITS% $listedroits] \
 				[list %LISTEDREQ% $listedreq] \
 				[list %LISTEDHCPPROFILS% $listedhcpprof] \
+				[list %LISTEVLAN% $listevlan] \
 			    ]
 }
 
@@ -752,6 +814,7 @@ d cgi-register {action mod} {
     {eqrw[0-9]+		0 9999}
     {eqallow[0-9]+	0 9999}
     {eqpat[0-9]+	0 9999}
+    {vlanid[0-9]+	0 9999}
 } {
     global conf
     global ah
@@ -1090,6 +1153,32 @@ d cgi-register {action mod} {
     }
 
     #
+    # Test VLAN ids
+    #
+
+    set lvlan {}
+    set n 1
+    foreach iv [::pgsql::getcols $dbfd topo.vlan "" "vlanid ASC" {vlanid descr}] {
+	lassign $iv vlanid descr
+	set tvlan($descr) $vlanid
+    }
+    while {[info exists ftab(vlan$n)]} {
+	set descr [string trim [lindex $ftab(vlan$n) 0]]
+	if {$descr ne ""} then {
+	    if {! [info exists tvlan($descr)]} then {
+		d error [mc "Invalid VLAN '%s'" $descr]
+	    }
+
+	    set vlanid $tvlan($descr)
+	    if {$vlanid < 1 || $vlanid > 4094} then {
+		d error [mc "VLAN id '%s' out of range" $vlanid]
+	    }
+	    lappend lvlan $vlanid
+	}
+	incr n
+    }
+
+    #
     # Test data consistency
     #
 
@@ -1353,6 +1442,13 @@ d cgi-register {action mod} {
 			VALUES ($idgrp, $iddhcpprofil, $tri)"
     }
 
+    # VLAN id authorized for the group
+    lappend cmd "DELETE FROM topo.dr_vlan WHERE idgrp = $idgrp"
+    foreach vlanid $lvlan {
+	lappend cmd "INSERT INTO topo.dr_vlan (idgrp, vlanid)
+			VALUES ($idgrp, $vlanid)"
+    }
+
     #
     # Proceed to database modification
     #
@@ -1372,7 +1468,7 @@ d cgi-register {action mod} {
     set h [display-group $dbfd $idgrp]
     lassign $h \
 		tabdroits tablogins tabreseaux tabcidrhorsreseau \
-		tabdomaines tabdhcpprofils tabdreq
+		tabdomaines tabdhcpprofils tabdreq tabvlan
 
     #
     # End of script: output page and close database
@@ -1387,6 +1483,7 @@ d cgi-register {action mod} {
 			    [list %TABDOMAINES% $tabdomaines] \
 			    [list %TABDHCPPROFILS% $tabdhcpprofils] \
 			    [list %TABDREQ% $tabdreq] \
+			    [list %TABVLAN% $tabvlan] \
 			]
 }
 
